@@ -116,18 +116,22 @@ function getInitialPage(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Claude Canvas</title>
+  <title>Canvas</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       min-height: 100vh;
       font-family: system-ui, sans-serif;
-      background: #fafafa;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #999;
     }
   </style>
 </head>
 <body>
-  <!-- Claude will create everything here -->
+  <p>Waiting for Claude to start...</p>
 </body>
 </html>`;
 }

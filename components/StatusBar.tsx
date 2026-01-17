@@ -2,31 +2,50 @@
 
 interface StatusBarProps {
   isTyping: boolean;
-  version: number;
   currentInstruction: string | null;
 }
 
-export function StatusBar({ isTyping, version, currentInstruction }: StatusBarProps) {
+export function StatusBar({ isTyping, currentInstruction }: StatusBarProps) {
   return (
-    <div className="bg-zinc-950 text-zinc-400 px-4 py-3 flex items-center justify-between text-sm border-t border-zinc-800">
+    <div className="bg-black text-green-600 px-4 py-2 flex items-center justify-between text-xs font-mono border-t border-green-900/50">
       <div className="flex items-center gap-4">
+        {/* Process status */}
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${isTyping ? 'bg-green-500 animate-pulse' : 'bg-zinc-600'}`}></div>
-          <span>{isTyping ? 'Claude is working...' : 'Idle'}</span>
+          <span className="text-green-700">[</span>
+          <div className={`w-1.5 h-1.5 rounded-full ${isTyping ? 'bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]' : 'bg-green-900'}`}></div>
+          <span className={isTyping ? 'text-green-400' : 'text-green-700'}>
+            {isTyping ? 'PROCESS_ACTIVE' : 'IDLE'}
+          </span>
+          <span className="text-green-700">]</span>
         </div>
+
+        {/* Current instruction */}
         {currentInstruction && (
-          <div className="text-zinc-500 truncate max-w-md">
-            Instruction: &quot;{currentInstruction}&quot;
+          <div className="flex items-center gap-2 text-green-600/70 truncate max-w-md">
+            <span className="text-green-700">{'>'}</span>
+            <span className="truncate">{currentInstruction}</span>
           </div>
         )}
       </div>
+
       <div className="flex items-center gap-4">
-        <span className="text-zinc-500">
-          Version: <span className="text-zinc-300">{version}</span>
-        </span>
-        <span className="text-zinc-600">
-          Powered by Claude
-        </span>
+        {/* Version */}
+        <div className="flex items-center gap-1">
+          <span className="text-green-700">rev:</span>
+          <span className="text-green-500">1.72</span>
+        </div>
+
+        {/* Separator */}
+        <span className="text-green-900">|</span>
+
+        {/* Powered by */}
+        <div className="flex items-center gap-1">
+          <span className="text-green-800">powered_by:</span>
+          <span className="text-green-600">claude</span>
+        </div>
+
+        {/* Blinking cursor */}
+        <span className="text-green-500 animate-pulse">_</span>
       </div>
     </div>
   );
