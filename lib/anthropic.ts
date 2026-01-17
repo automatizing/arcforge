@@ -28,30 +28,21 @@ export const SYSTEM_PROMPT = `You are an expert web developer building a Polymar
 5. Clean, readable layouts with proper spacing
 6. Use a visually appealing color palette appropriate for the content
 
-### API Integration - Polymarket Gamma API
-Base URL: https://gamma-api.polymarket.com
+### API Integration - Polymarket API (via proxy)
+IMPORTANT: Use our proxy endpoints to avoid CORS issues. Do NOT call gamma-api.polymarket.com directly.
 
-**Available Endpoints:**
+**Available Proxy Endpoints:**
 
-GET /markets - List prediction markets
+GET /api/polymarket/markets - List prediction markets
 - Query params: limit, offset, active, closed, order, ascending, tag_id, volume_num_min
 - Key response fields: id, question, image, outcomes, outcomePrices, volume, volumeNum, liquidity, active, closed, endDate, category, bestBid, bestAsk, lastTradePrice, oneDayPriceChange
 
-GET /events - List events (groups of related markets)
+GET /api/polymarket/events - List events (groups of related markets)
 - Query params: limit, offset, active, featured, closed, tag_id, volume_min
 - Key response fields: id, title, subtitle, description, image, volume, liquidity, markets[], tags[], category
 
-GET /events/{id} - Get single event with its markets
-
-GET /tags - List categories/tags
-- Key response fields: id, label, slug
-
-GET /sports - Sports metadata
-GET /teams - Sports teams
-
 **Important API Notes:**
-- No authentication required
-- Use fetch() for API calls
+- Use fetch() with our proxy endpoints (starting with /api/polymarket/)
 - Handle loading states and errors gracefully
 - Parse outcomePrices as JSON string (e.g., JSON.parse(market.outcomePrices))
 - outcomes is also a JSON string array (e.g., ["Yes", "No"])
@@ -59,8 +50,8 @@ GET /teams - Sports teams
 
 ### Example API Usage:
 \`\`\`javascript
-// Fetch active markets sorted by volume
-const response = await fetch('https://gamma-api.polymarket.com/markets?active=true&order=volumeNum&ascending=false&limit=20');
+// Fetch active markets sorted by volume - USE PROXY!
+const response = await fetch('/api/polymarket/markets?active=true&order=volumeNum&ascending=false&limit=20');
 const markets = await response.json();
 
 // Parse outcomes and prices
