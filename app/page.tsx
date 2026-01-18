@@ -3,13 +3,18 @@
 import { useClaudeStream } from '@/hooks/useClaudeStream';
 import { CodeViewer } from '@/components/CodeViewer';
 import { LivePreview } from '@/components/LivePreview';
+import { FileExplorer } from '@/components/FileExplorer';
 import { StatusBar } from '@/components/StatusBar';
 
 export default function Home() {
-  const { streamingCode, currentPage, isTyping, currentInstruction } = useClaudeStream();
-
-  // Show streaming code while typing, otherwise show current page code
-  const displayCode = isTyping ? streamingCode : currentPage;
+  const {
+    displayFiles,
+    displayHtml,
+    activeFile,
+    setActiveFile,
+    isTyping,
+    currentInstruction
+  } = useClaudeStream();
 
   return (
     <div className="h-screen flex flex-col bg-black">
@@ -55,16 +60,31 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 grid grid-cols-2 gap-1 p-1 min-h-0">
-        {/* Left Panel: Live Preview */}
-        <div className="rounded-lg overflow-hidden border border-green-900/30">
-          <LivePreview html={currentPage} isTyping={isTyping} />
+      {/* Main Content - Preview (left) | Explorer + Code (right) */}
+      <main className="flex-1 flex gap-1 p-1 min-h-0 overflow-hidden">
+        {/* Left Panel: Live Preview (takes most space) */}
+        <div className="flex-1 rounded-lg overflow-hidden border border-green-900/30 min-w-0">
+          <LivePreview html={displayHtml} isTyping={isTyping} />
         </div>
 
-        {/* Right Panel: Code */}
-        <div className="rounded-lg overflow-hidden border border-green-900/30">
-          <CodeViewer code={displayCode} isTyping={isTyping} />
+        {/* Right Panel: Explorer + Code (fixed width) */}
+        <div className="w-[380px] flex-shrink-0 flex flex-col rounded-lg overflow-hidden border border-green-900/30">
+          {/* File Explorer */}
+          <FileExplorer
+            files={displayFiles}
+            activeFile={activeFile}
+            onFileSelect={setActiveFile}
+            isTyping={isTyping}
+          />
+
+          {/* Code Viewer */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <CodeViewer
+              files={displayFiles}
+              activeFile={activeFile}
+              isTyping={isTyping}
+            />
+          </div>
         </div>
       </main>
 

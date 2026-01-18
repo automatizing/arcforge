@@ -7,8 +7,12 @@ CREATE TABLE page_state (
   content TEXT NOT NULL,
   version INTEGER NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  instruction TEXT
+  instruction TEXT,
+  files JSONB DEFAULT '[]'::jsonb
 );
+
+-- Migration for existing tables (run if table already exists):
+-- ALTER TABLE page_state ADD COLUMN IF NOT EXISTS files JSONB DEFAULT '[]'::jsonb;
 
 -- Index for fast version lookups
 CREATE INDEX idx_page_state_version ON page_state(version DESC);
