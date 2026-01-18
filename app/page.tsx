@@ -13,7 +13,8 @@ export default function Home() {
     activeFile,
     setActiveFile,
     isTyping,
-    currentInstruction
+    currentInstruction,
+    currentPhase
   } = useClaudeStream();
 
   return (
@@ -92,6 +93,7 @@ export default function Home() {
       <StatusBar
         isTyping={isTyping}
         currentInstruction={currentInstruction}
+        currentPhase={currentPhase}
       />
     </div>
   );

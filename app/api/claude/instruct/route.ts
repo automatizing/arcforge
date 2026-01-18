@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { anthropic, SYSTEM_PROMPT } from '@/lib/anthropic';
 import { getSupabaseAdmin } from '@/lib/supabase/server';
+import { BUILD_PHASES, getPhasePrompt } from '@/lib/build-phases';
 
 export const dynamic = 'force-dynamic';
 
@@ -113,6 +114,102 @@ body {
   ];
 }
 
+// Execute a single phase
+async function executePhase(
+  channel: ReturnType<ReturnType<typeof getSupabaseAdmin>['channel']>,
+  currentFiles: ParsedFile[],
+  phaseId: string,
+  phaseName: string,
+  phaseDescription: string,
+  userInstruction: string,
+  phaseIndex: number,
+  totalPhases: number
+): Promise<ParsedFile[]> {
+  // Broadcast phase start
+  await channel.send({
+    type: 'broadcast',
+    event: 'phase_start',
+    payload: {
+      phaseId,
+      phaseName,
+      phaseDescription,
+      phaseIndex,
+      totalPhases
+    }
+  });
+
+  // Small delay for UI to update
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  const phasePrompt = getPhasePrompt(phaseId, userInstruction);
+
+  let fullResponse = '';
+  let chunkBuffer = '';
+  const BUFFER_SIZE = 3;
+
+  const stream = anthropic.messages.stream({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 8192,
+    system: SYSTEM_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: `Current files:\n\n${currentFiles.map(f => `===FILE:${f.name}===\n${f.content}\n===ENDFILE===`).join('\n\n')}\n\n${phasePrompt}`
+      }
+    ]
+  });
+
+  for await (const event of stream) {
+    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+      const text = event.delta.text;
+      fullResponse += text;
+      chunkBuffer += text;
+
+      if (chunkBuffer.length >= BUFFER_SIZE || chunkBuffer.includes('\n')) {
+        await channel.send({
+          type: 'broadcast',
+          event: 'chunk',
+          payload: { text: chunkBuffer, phaseId }
+        });
+        chunkBuffer = '';
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }
+  }
+
+  // Send remaining buffer
+  if (chunkBuffer.length > 0) {
+    await channel.send({
+      type: 'broadcast',
+      event: 'chunk',
+      payload: { text: chunkBuffer, phaseId }
+    });
+  }
+
+  // Parse the response
+  const parsedFiles = parseFiles(fullResponse);
+
+  // Broadcast phase complete with updated files
+  const combinedHtml = combineFilesForPreview(parsedFiles);
+  await channel.send({
+    type: 'broadcast',
+    event: 'phase_complete',
+    payload: {
+      phaseId,
+      phaseName,
+      files: parsedFiles,
+      combinedHtml,
+      phaseIndex,
+      totalPhases
+    }
+  });
+
+  // Pause between phases for dramatic effect and to let users see the result
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  return parsedFiles;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Validate owner authentication
@@ -140,8 +237,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     const initialFiles = getInitialFiles();
-    const currentFiles: ParsedFile[] = currentPage?.files || initialFiles;
-    const currentContent = currentPage?.content || combineFilesForPreview(initialFiles);
+    let currentFiles: ParsedFile[] = currentPage?.files || initialFiles;
     const currentVersion = currentPage?.version || 0;
 
     // Setup broadcast channel
@@ -158,67 +254,35 @@ export async function POST(request: NextRequest) {
       });
     });
 
-    // Broadcast that Claude is starting to type
+    // Broadcast that Claude is starting
     await channel.send({
       type: 'broadcast',
       event: 'start',
-      payload: { instruction }
+      payload: {
+        instruction,
+        totalPhases: BUILD_PHASES.length
+      }
     });
 
-    // Small delay to ensure start event is received
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    // Call Claude with streaming
-    let fullResponse = '';
-    let chunkBuffer = '';
-    const BUFFER_SIZE = 3; // Send every 3 characters for smoother streaming
-
-    const stream = anthropic.messages.stream({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 8192,
-      system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: `Current files:\n\n${currentFiles.map(f => `===FILE:${f.name}===\n${f.content}\n===ENDFILE===`).join('\n\n')}\n\nInstruction: ${instruction}`
-        }
-      ]
-    });
-
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-        const text = event.delta.text;
-        fullResponse += text;
-        chunkBuffer += text;
-
-        // Send chunks when buffer reaches threshold or contains newline
-        if (chunkBuffer.length >= BUFFER_SIZE || chunkBuffer.includes('\n')) {
-          await channel.send({
-            type: 'broadcast',
-            event: 'chunk',
-            payload: { text: chunkBuffer }
-          });
-          chunkBuffer = '';
-          // Small delay to prevent overwhelming the channel
-          await new Promise(resolve => setTimeout(resolve, 10));
-        }
-      }
+    // Execute each phase sequentially
+    for (let i = 0; i < BUILD_PHASES.length; i++) {
+      const phase = BUILD_PHASES[i];
+      currentFiles = await executePhase(
+        channel,
+        currentFiles,
+        phase.id,
+        phase.name,
+        phase.description,
+        instruction,
+        i + 1,
+        BUILD_PHASES.length
+      );
     }
 
-    // Send any remaining buffered content
-    if (chunkBuffer.length > 0) {
-      await channel.send({
-        type: 'broadcast',
-        event: 'chunk',
-        payload: { text: chunkBuffer }
-      });
-    }
-
-    // Parse the multi-file response
-    const parsedFiles = parseFiles(fullResponse);
-    const combinedHtml = combineFilesForPreview(parsedFiles);
-
-    // Save new page state with files
+    // Save final page state
+    const combinedHtml = combineFilesForPreview(currentFiles);
     const newVersion = currentVersion + 1;
     await supabaseAdmin
       .from('page_state')
@@ -226,18 +290,15 @@ export async function POST(request: NextRequest) {
         content: combinedHtml,
         version: newVersion,
         instruction,
-        files: parsedFiles
+        files: currentFiles
       });
 
-    // Small delay before completion to ensure all chunks are received
-    await new Promise(resolve => setTimeout(resolve, 200));
-
-    // Broadcast completion with files
+    // Broadcast final completion
     await channel.send({
       type: 'broadcast',
       event: 'complete',
       payload: {
-        files: parsedFiles,
+        files: currentFiles,
         combinedHtml,
         version: newVersion
       }

@@ -1,11 +1,14 @@
 'use client';
 
+import { PhaseInfo } from '@/hooks/useClaudeStream';
+
 interface StatusBarProps {
   isTyping: boolean;
   currentInstruction: string | null;
+  currentPhase?: PhaseInfo | null;
 }
 
-export function StatusBar({ isTyping, currentInstruction }: StatusBarProps) {
+export function StatusBar({ isTyping, currentInstruction, currentPhase }: StatusBarProps) {
   return (
     <div className="bg-black text-green-600 px-4 py-2 flex items-center justify-between text-xs font-mono border-t border-green-900/50">
       <div className="flex items-center gap-4">
@@ -19,8 +22,18 @@ export function StatusBar({ isTyping, currentInstruction }: StatusBarProps) {
           <span className="text-green-700">]</span>
         </div>
 
-        {/* Current instruction */}
-        {currentInstruction && (
+        {/* Phase indicator */}
+        {currentPhase && (
+          <div className="flex items-center gap-2">
+            <span className="text-green-700">[</span>
+            <span className="text-yellow-500">PHASE {currentPhase.phaseIndex}/{currentPhase.totalPhases}</span>
+            <span className="text-green-700">]</span>
+            <span className="text-green-500">{currentPhase.phaseName}</span>
+          </div>
+        )}
+
+        {/* Current instruction (only show if no phase is active) */}
+        {currentInstruction && !currentPhase && (
           <div className="flex items-center gap-2 text-green-600/70 truncate max-w-md">
             <span className="text-green-700">{'>'}</span>
             <span className="truncate">{currentInstruction}</span>

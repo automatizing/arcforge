@@ -13,6 +13,7 @@ export default function OwnerPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
 
   const {
     displayFiles,
@@ -20,7 +21,8 @@ export default function OwnerPage() {
     activeFile,
     setActiveFile,
     streamingCode,
-    isTyping
+    isTyping,
+    currentPhase
   } = useClaudeStream();
 
   // Check if already authenticated from localStorage
@@ -65,6 +67,41 @@ export default function OwnerPage() {
     localStorage.removeItem('owner_api_key');
     setApiKey('');
     setIsAuthenticated(false);
+  };
+
+  const handleReset = async () => {
+    if (!confirm('Are you sure you want to reset? This will delete all page versions and start fresh.')) {
+      return;
+    }
+
+    setIsResetting(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch('/api/page/reset', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          setIsAuthenticated(false);
+          throw new Error('Session expired');
+        }
+        throw new Error('Failed to reset');
+      }
+
+      setSuccess('Page reset successfully! Ready for a fresh start.');
+      // Reload the page to reset all state
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Reset failed');
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -182,6 +219,13 @@ export default function OwnerPage() {
           </div>
           <div className="flex items-center gap-4">
             <button
+              onClick={handleReset}
+              disabled={isResetting || isTyping}
+              className="text-red-700 hover:text-red-400 text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isResetting ? '[resetting...]' : '[reset]'}
+            </button>
+            <button
               onClick={handleLogout}
               className="text-green-700 hover:text-green-400 text-xs transition-colors"
             >
@@ -209,7 +253,14 @@ export default function OwnerPage() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                 </span>
-                <span>processing...</span>
+                {currentPhase ? (
+                  <span>
+                    <span className="text-yellow-500">PHASE {currentPhase.phaseIndex}/{currentPhase.totalPhases}</span>
+                    <span className="text-green-600 ml-2">{currentPhase.phaseName}</span>
+                  </span>
+                ) : (
+                  <span>processing...</span>
+                )}
               </span>
             )}
           </div>

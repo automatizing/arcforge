@@ -18,6 +18,15 @@ const INITIAL_FILES: FileState[] = [
   { name: 'script.js', type: 'js', content: '// JavaScript will appear here' }
 ];
 
+// Phase information
+export interface PhaseInfo {
+  phaseId: string;
+  phaseName: string;
+  phaseDescription: string;
+  phaseIndex: number;
+  totalPhases: number;
+}
+
 interface ClaudeStreamState {
   streamingCode: string;
   streamingFiles: FileState[];
@@ -27,6 +36,9 @@ interface ClaudeStreamState {
   isTyping: boolean;
   currentInstruction: string | null;
   version: number;
+  // Phase-related state
+  currentPhase: PhaseInfo | null;
+  totalPhases: number;
 }
 
 // Parse streaming content into files (during streaming)
@@ -89,7 +101,9 @@ export function useClaudeStream() {
     activeFile: 'index.html',
     isTyping: false,
     currentInstruction: null,
-    version: 0
+    version: 0,
+    currentPhase: null,
+    totalPhases: 0
   });
 
   // Fetch initial page state
@@ -133,7 +147,23 @@ export function useClaudeStream() {
               isTyping: true,
               streamingCode: '',
               streamingFiles: [],
-              currentInstruction: payload.instruction
+              currentInstruction: payload.instruction,
+              totalPhases: payload.totalPhases || 1,
+              currentPhase: null
+            }));
+          })
+          .on('broadcast', { event: 'phase_start' }, ({ payload }) => {
+            setState(prev => ({
+              ...prev,
+              streamingCode: '',
+              streamingFiles: [],
+              currentPhase: {
+                phaseId: payload.phaseId,
+                phaseName: payload.phaseName,
+                phaseDescription: payload.phaseDescription,
+                phaseIndex: payload.phaseIndex,
+                totalPhases: payload.totalPhases
+              }
             }));
           })
           .on('broadcast', { event: 'chunk' }, ({ payload }) => {
@@ -147,6 +177,16 @@ export function useClaudeStream() {
               };
             });
           })
+          .on('broadcast', { event: 'phase_complete' }, ({ payload }) => {
+            // Update with phase results, but keep typing state
+            setState(prev => ({
+              ...prev,
+              currentPage: payload.combinedHtml,
+              currentFiles: payload.files || prev.currentFiles,
+              streamingCode: '',
+              streamingFiles: []
+            }));
+          })
           .on('broadcast', { event: 'complete' }, ({ payload }) => {
             setState(prev => ({
               ...prev,
@@ -156,7 +196,8 @@ export function useClaudeStream() {
               streamingCode: '',
               streamingFiles: [],
               version: payload.version,
-              currentInstruction: null
+              currentInstruction: null,
+              currentPhase: null
             }));
           });
 
