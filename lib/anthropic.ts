@@ -81,44 +81,57 @@ Use this specific color scheme:
 ### API Integration - Polymarket Gamma API (via proxy)
 IMPORTANT: Use our proxy endpoints to avoid CORS issues. Do NOT call gamma-api.polymarket.com directly.
 
-**RECOMMENDED APPROACH - Use Events Endpoint:**
-Events contain their associated markets and give you the best data structure.
-
-GET /api/polymarket/events?order=id&ascending=false&closed=false&limit=20
-
-**Events Response Structure:**
-Each event contains:
-- id: event identifier
-- title: the event title
-- slug: URL slug for linking
-- image: URL to event image
-- markets: array of market objects within this event
-
-**Each market within an event has:**
-- id: market identifier
-- question: the market question
-- outcomePrices: string like "0.65,0.35" (comma-separated, NOT JSON array)
-- volume: volume as string number
-- liquidity: liquidity amount as string
-- image: market-specific image (may be null, use event image as fallback)
-
-**ALTERNATIVE - Direct Markets Endpoint:**
+**USE THIS ENDPOINT:**
 GET /api/polymarket/markets?closed=false&limit=20
 
-**Markets Response fields:**
-- id: market identifier
-- question: the market question/title
-- image: URL to market image
-- outcomePrices: string like "0.65,0.35" (comma-separated decimals)
-- volume: volume as string
-- liquidity: liquidity as string
-- slug: URL slug for the event
+**REAL API RESPONSE EXAMPLE:**
+The API returns an array of market objects. Here is the ACTUAL structure:
+[
+  {
+    "id": "517310",
+    "question": "Will Trump deport less than 250,000?",
+    "slug": "will-trump-deport-less-than-250000",
+    "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/example.jpg",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"0.034\", \"0.966\"]",
+    "volume": "963036.370732",
+    "liquidity": "8447.6388",
+    "volumeNum": 963036.370732,
+    "liquidityNum": 8447.6388
+  }
+]
 
-**CRITICAL - Parsing outcomePrices:**
-outcomePrices is a COMMA-SEPARATED STRING, not a JSON array!
-const prices = market.outcomePrices ? market.outcomePrices.split(',') : ['0.5', '0.5'];
-const yesPrice = parseFloat(prices[0]); // 0.65 = 65%
-const noPrice = parseFloat(prices[1]); // 0.35 = 35%
+**CRITICAL - PARSING THE DATA:**
+Both "outcomes" and "outcomePrices" are JSON STRINGS that need to be parsed!
+
+// Correct way to parse:
+const outcomes = JSON.parse(market.outcomes || '["Yes", "No"]');
+const prices = JSON.parse(market.outcomePrices || '["0.5", "0.5"]');
+const yesPrice = parseFloat(prices[0]); // 0.034 = 3.4%
+const noPrice = parseFloat(prices[1]);  // 0.966 = 96.6%
+
+// Display as percentage:
+const yesPercent = Math.round(yesPrice * 100); // 3
+
+**COMPLETE WORKING EXAMPLE:**
+async function loadMarkets() {
+  try {
+    const response = await fetch('/api/polymarket/markets?closed=false&limit=15');
+    const markets = await response.json();
+
+    markets.forEach(market => {
+      const prices = JSON.parse(market.outcomePrices || '["0.5", "0.5"]');
+      const yesPrice = Math.round(parseFloat(prices[0]) * 100);
+      const volume = formatVolume(market.volume);
+      const imageUrl = market.image || 'https://via.placeholder.com/300x200?text=No+Image';
+      const tradeUrl = 'https://polymarket.com/event/' + market.slug;
+
+      // Now render the card with: market.question, yesPrice, volume, imageUrl, tradeUrl
+    });
+  } catch (error) {
+    console.error('Failed to load markets:', error);
+  }
+}
 
 **Format volume nicely:**
 function formatVolume(vol) {
@@ -129,7 +142,7 @@ function formatVolume(vol) {
 }
 
 **Trade button URL:**
-https://polymarket.com/event/[slug]
+https://polymarket.com/event/[market.slug]
 
 ### Error Handling
 1. Show loading skeleton/spinner while fetching
