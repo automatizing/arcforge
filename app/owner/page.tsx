@@ -197,73 +197,82 @@ export default function OwnerPage() {
         </div>
       </header>
 
-      <main className="flex-1 p-4 min-h-0">
-        <div className="h-full grid grid-cols-[1fr,380px] gap-4">
-          {/* Left: Preview (large) */}
-          <div className="flex flex-col gap-4 min-h-0">
-            {/* Preview */}
-            <div className="flex-1 bg-black rounded-lg border border-green-900/50 overflow-hidden flex flex-col min-h-0">
-              <div className="bg-green-950/30 px-4 py-2 text-xs text-green-600 flex items-center justify-between border-b border-green-900/50">
-                <div className="flex items-center gap-2">
-                  <span className="text-green-700">{'>'}</span>
-                  <span>OUTPUT_PREVIEW</span>
-                  {isTyping && (
-                    <span className="flex items-center gap-1 text-green-500 ml-2">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                      </span>
-                      <span>updating...</span>
-                    </span>
-                  )}
-                </div>
-                <span className="text-green-700">rev:<span className="text-green-500">1.72</span></span>
-              </div>
-              <div className="flex-1 bg-white min-h-0">
-                <iframe
-                  srcDoc={displayHtml}
-                  className="w-full h-full border-0"
-                  sandbox="allow-scripts"
-                  title="Preview"
-                />
-              </div>
+      <main className="flex-1 p-4 min-h-0 flex flex-col gap-4">
+        {/* Top: Instruction Form (prominent) */}
+        <form onSubmit={handleSubmit} className="bg-black rounded-lg p-4 border border-green-900/50">
+          <div className="flex items-center gap-2 mb-3 text-xs text-green-600">
+            <span className="text-green-700">{'>'}</span>
+            <span>INSTRUCTION_INPUT</span>
+            {isTyping && (
+              <span className="flex items-center gap-1 text-green-500 ml-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                <span>processing...</span>
+              </span>
+            )}
+          </div>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <textarea
+                value={instruction}
+                onChange={(e) => setInstruction(e.target.value)}
+                placeholder="describe what to build..."
+                rows={4}
+                className="w-full bg-black border border-green-900/50 rounded px-3 py-2 text-green-400 placeholder-green-900 focus:outline-none focus:border-green-500 text-sm resize-none"
+              />
             </div>
+            <button
+              type="submit"
+              disabled={isLoading || isTyping}
+              className="px-8 bg-green-900/30 border border-green-700/50 text-green-400 font-bold rounded hover:bg-green-900/50 hover:border-green-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm self-stretch"
+            >
+              {isLoading ? 'SENDING...' : isTyping ? 'ACTIVE' : 'EXECUTE'}
+            </button>
+          </div>
+          {error && (
+            <div className="mt-2 p-2 bg-red-950/30 border border-red-900/50 rounded text-red-500 text-xs">
+              <span className="text-red-700">[ERROR]</span> {error}
+            </div>
+          )}
+          {success && (
+            <div className="mt-2 p-2 bg-green-950/30 border border-green-900/50 rounded text-green-400 text-xs">
+              <span className="text-green-600">[SUCCESS]</span> {success}
+            </div>
+          )}
+        </form>
 
-            {/* Instruction Form (compact) */}
-            <form onSubmit={handleSubmit} className="bg-black rounded-lg p-4 border border-green-900/50">
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <textarea
-                    value={instruction}
-                    onChange={(e) => setInstruction(e.target.value)}
-                    placeholder="describe what to build..."
-                    rows={2}
-                    className="w-full bg-black border border-green-900/50 rounded px-3 py-2 text-green-400 placeholder-green-900 focus:outline-none focus:border-green-500 text-sm resize-none"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={isLoading || isTyping}
-                  className="px-6 bg-green-900/30 border border-green-700/50 text-green-400 font-bold rounded hover:bg-green-900/50 hover:border-green-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  {isLoading ? 'SENDING...' : isTyping ? 'ACTIVE' : 'EXECUTE'}
-                </button>
+        {/* Bottom: Preview (small) + Files/Code */}
+        <div className="flex-1 flex gap-4 min-h-0">
+          {/* Left: Small Preview */}
+          <div className="w-[280px] flex-shrink-0 bg-black rounded-lg border border-green-900/50 overflow-hidden flex flex-col">
+            <div className="bg-green-950/30 px-3 py-1.5 text-xs text-green-600 flex items-center justify-between border-b border-green-900/50">
+              <div className="flex items-center gap-2">
+                <span className="text-green-700">{'>'}</span>
+                <span>PREVIEW</span>
               </div>
-              {error && (
-                <div className="mt-2 p-2 bg-red-950/30 border border-red-900/50 rounded text-red-500 text-xs">
-                  <span className="text-red-700">[ERROR]</span> {error}
-                </div>
-              )}
-              {success && (
-                <div className="mt-2 p-2 bg-green-950/30 border border-green-900/50 rounded text-green-400 text-xs">
-                  <span className="text-green-600">[SUCCESS]</span> {success}
-                </div>
-              )}
-            </form>
+              <a
+                href="/"
+                target="_blank"
+                className="text-green-700 hover:text-green-400 transition-colors"
+                title="Open full preview"
+              >
+                [↗]
+              </a>
+            </div>
+            <div className="flex-1 bg-white min-h-0">
+              <iframe
+                srcDoc={displayHtml}
+                className="w-full h-full border-0"
+                sandbox="allow-scripts"
+                title="Preview"
+              />
+            </div>
           </div>
 
           {/* Right: Files + Code */}
-          <div className="flex flex-col rounded-lg border border-green-900/50 overflow-hidden min-h-0">
+          <div className="flex-1 flex flex-col rounded-lg border border-green-900/50 overflow-hidden min-h-0">
             <FileExplorer
               files={displayFiles}
               activeFile={activeFile}
