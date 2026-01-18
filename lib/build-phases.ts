@@ -51,14 +51,16 @@ The page should now look visually complete but with static/placeholder content.`
     prompt: `PHASE 3 - JAVASCRIPT FUNCTIONALITY
 
 Now add the complete JavaScript functionality:
-- Fetch data from /api/polymarket/markets?active=true&order=volumeNum&ascending=false&limit=15
-- Parse the API response (outcomes, outcomePrices are JSON strings)
-- Render market cards dynamically
+- Fetch data from /api/polymarket/markets?closed=false&limit=15
+- CRITICAL: The outcomePrices field is a JSON STRING like "[\"0.65\",\"0.35\"]" - you MUST use JSON.parse(market.outcomePrices) to get the array
+- Use market.image for the image URL (NOT external placeholder services)
+- Render market cards dynamically with: image, question, volume, liquidity, probability
 - Format volume nicely ($1.2M, $500K, etc.)
+- Calculate probability: parseFloat(JSON.parse(market.outcomePrices)[0]) * 100
 - Handle loading states (show/hide skeletons)
-- Handle errors gracefully
+- Handle errors gracefully with console.error
 - Add refresh button functionality
-- Make trade buttons link to https://polymarket.com/event/[slug]
+- Make trade buttons link to https://polymarket.com/event/ + market.slug
 
 Keep HTML and CSS mostly the same, just ensure they support the dynamic content.
 
