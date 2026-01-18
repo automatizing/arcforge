@@ -18,6 +18,53 @@ const INITIAL_FILES: FileState[] = [
   { name: 'script.js', type: 'js', content: '// JavaScript will appear here' }
 ];
 
+// Initial HTML for preview (shown while loading)
+const INITIAL_HTML = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Canvas</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      font-family: system-ui, sans-serif;
+      background: #0F172A;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94A3B8;
+    }
+    .loading {
+      text-align: center;
+    }
+    .loading p {
+      margin-top: 1rem;
+      font-size: 0.875rem;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #1E293B;
+      border-top-color: #3B82F6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="loading">
+    <div class="spinner"></div>
+    <p>Waiting for Claude to start...</p>
+  </div>
+</body>
+</html>`;
+
 // Phase information
 export interface PhaseInfo {
   phaseId: string;
@@ -96,7 +143,7 @@ export function useClaudeStream() {
   const [state, setState] = useState<ClaudeStreamState>({
     streamingCode: '',
     streamingFiles: [],
-    currentPage: '',
+    currentPage: INITIAL_HTML,
     currentFiles: INITIAL_FILES,
     activeFile: 'index.html',
     isTyping: false,
@@ -223,7 +270,7 @@ export function useClaudeStream() {
 
   const displayHtml = state.isTyping && state.streamingFiles.length > 0
     ? combineFilesForPreview(state.streamingFiles)
-    : state.currentPage;
+    : (state.currentPage || INITIAL_HTML);
 
   return {
     ...state,
