@@ -31,7 +31,7 @@ export function LivePreview({ html, isTyping }: LivePreviewProps) {
         <iframe
           srcDoc={html}
           className="w-full h-full border-0"
-          sandbox="allow-scripts"
+          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
           title="Live Preview"
         />
       </div>
