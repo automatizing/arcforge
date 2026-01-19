@@ -171,9 +171,9 @@ async function executePhase(
 
   let fullResponse = '';
   let chunkBuffer = '';
-  const BUFFER_SIZE = 2; // Smaller buffer = more granular streaming
-  const CHUNK_DELAY_MS = 50; // Delay between chunks (50ms for moderate speed)
-  const NEWLINE_EXTRA_DELAY_MS = 30; // Extra delay on newlines for dramatic effect
+  const BUFFER_SIZE = 1; // Single character for maximum granularity
+  const CHUNK_DELAY_MS = 150; // Slow delay between chunks for dramatic effect
+  const NEWLINE_EXTRA_DELAY_MS = 100; // Extra delay on newlines for natural typing feel
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
@@ -236,7 +236,7 @@ async function executePhase(
   });
 
   // Pause between phases for dramatic effect and to let users see the result
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  await new Promise(resolve => setTimeout(resolve, 5000));
 
   return parsedFiles;
 }
@@ -249,9 +249,9 @@ async function executeDirectMode(
 ): Promise<ParsedFile[]> {
   let fullResponse = '';
   let chunkBuffer = '';
-  const BUFFER_SIZE = 2; // Smaller buffer = more granular streaming
-  const CHUNK_DELAY_MS = 50; // Delay between chunks (50ms for moderate speed)
-  const NEWLINE_EXTRA_DELAY_MS = 30; // Extra delay on newlines for dramatic effect
+  const BUFFER_SIZE = 1; // Single character for maximum granularity
+  const CHUNK_DELAY_MS = 150; // Slow delay between chunks for dramatic effect
+  const NEWLINE_EXTRA_DELAY_MS = 100; // Extra delay on newlines for natural typing feel
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
