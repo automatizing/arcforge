@@ -280,6 +280,113 @@ async function executeDirectMode(
   return parseFiles(fullResponse);
 }
 
+// Background execution function - runs after response is sent
+async function executeInBackground(
+  instruction: string,
+  currentFiles: ParsedFile[],
+  currentVersion: number,
+  isFirstBuild: boolean
+) {
+  const supabaseAdmin = getSupabaseAdmin();
+
+  // Setup broadcast channel
+  const channel = supabaseAdmin.channel('claude-typing');
+
+  try {
+    // Subscribe and wait for connection
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Channel subscription timeout')), 10000);
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          clearTimeout(timeout);
+          resolve();
+        } else if (status === 'CHANNEL_ERROR') {
+          clearTimeout(timeout);
+          reject(new Error('Failed to subscribe to channel'));
+        }
+      });
+    });
+
+    // Broadcast that Claude is starting
+    await channel.send({
+      type: 'broadcast',
+      event: 'start',
+      payload: {
+        instruction,
+        totalPhases: isFirstBuild ? BUILD_PHASES.length : 1,
+        isFirstBuild
+      }
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    let files = currentFiles;
+
+    if (isFirstBuild) {
+      // First build: Execute each phase sequentially with Polymarket prompts
+      for (let i = 0; i < BUILD_PHASES.length; i++) {
+        const phase = BUILD_PHASES[i];
+        files = await executePhase(
+          channel,
+          files,
+          phase.id,
+          phase.name,
+          phase.description,
+          instruction,
+          i + 1,
+          BUILD_PHASES.length
+        );
+      }
+    } else {
+      // Modification: Direct mode without phases
+      files = await executeDirectMode(channel, files, instruction);
+    }
+
+    // Save final page state
+    const combinedHtml = combineFilesForPreview(files);
+    const newVersion = currentVersion + 1;
+    await supabaseAdmin
+      .from('page_state')
+      .insert({
+        content: combinedHtml,
+        version: newVersion,
+        instruction,
+        files: files
+      });
+
+    // Broadcast final completion
+    await channel.send({
+      type: 'broadcast',
+      event: 'complete',
+      payload: {
+        files: files,
+        combinedHtml,
+        version: newVersion
+      }
+    });
+
+  } catch (error) {
+    console.error('Background execution error:', error);
+    // Try to broadcast error to clients
+    try {
+      await channel.send({
+        type: 'broadcast',
+        event: 'error',
+        payload: { message: 'Build failed' }
+      });
+    } catch {
+      // Ignore broadcast error
+    }
+  } finally {
+    // Cleanup channel
+    try {
+      await supabaseAdmin.removeChannel(channel);
+    } catch {
+      // Ignore cleanup error
+    }
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Validate owner authentication
@@ -307,88 +414,19 @@ export async function POST(request: NextRequest) {
       .single();
 
     const initialFiles = getInitialFiles();
-    let currentFiles: ParsedFile[] = currentPage?.files || initialFiles;
+    const currentFiles: ParsedFile[] = currentPage?.files || initialFiles;
     const currentVersion = currentPage?.version || 0;
-
-    // Setup broadcast channel
-    const channel = supabaseAdmin.channel('claude-typing');
-
-    // Subscribe and wait for connection
-    await new Promise<void>((resolve, reject) => {
-      channel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          resolve();
-        } else if (status === 'CHANNEL_ERROR') {
-          reject(new Error('Failed to subscribe to channel'));
-        }
-      });
-    });
-
-    // Determine if this is first build (use phases) or modification (direct mode)
     const isFirstBuild = currentVersion === 0;
 
-    // Broadcast that Claude is starting
-    await channel.send({
-      type: 'broadcast',
-      event: 'start',
-      payload: {
-        instruction,
-        totalPhases: isFirstBuild ? BUILD_PHASES.length : 1,
-        isFirstBuild
-      }
-    });
+    // Start background execution WITHOUT awaiting
+    // This allows the response to return immediately while processing continues
+    executeInBackground(instruction, currentFiles, currentVersion, isFirstBuild);
 
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    if (isFirstBuild) {
-      // First build: Execute each phase sequentially with Polymarket prompts
-      for (let i = 0; i < BUILD_PHASES.length; i++) {
-        const phase = BUILD_PHASES[i];
-        currentFiles = await executePhase(
-          channel,
-          currentFiles,
-          phase.id,
-          phase.name,
-          phase.description,
-          instruction,
-          i + 1,
-          BUILD_PHASES.length
-        );
-      }
-    } else {
-      // Modification: Direct mode without phases
-      currentFiles = await executeDirectMode(channel, currentFiles, instruction);
-    }
-
-    // Save final page state
-    const combinedHtml = combineFilesForPreview(currentFiles);
-    const newVersion = currentVersion + 1;
-    await supabaseAdmin
-      .from('page_state')
-      .insert({
-        content: combinedHtml,
-        version: newVersion,
-        instruction,
-        files: currentFiles
-      });
-
-    // Broadcast final completion
-    await channel.send({
-      type: 'broadcast',
-      event: 'complete',
-      payload: {
-        files: currentFiles,
-        combinedHtml,
-        version: newVersion
-      }
-    });
-
-    // Cleanup channel
-    await supabaseAdmin.removeChannel(channel);
-
+    // Return immediately - the streaming happens via Supabase Realtime
     return NextResponse.json({
       success: true,
-      version: newVersion
+      message: 'Build started',
+      isFirstBuild
     });
 
   } catch (error) {

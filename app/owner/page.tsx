@@ -134,8 +134,8 @@ export default function OwnerPage() {
         throw new Error('Failed to send instruction');
       }
 
-      const data = await response.json();
-      setSuccess(`Instruction sent! New version: ${data.version}`);
+      await response.json();
+      setSuccess('Build started! Watch the live preview.');
       setInstruction('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
