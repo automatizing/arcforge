@@ -41,7 +41,7 @@ export default function Home() {
             {/* Social Links */}
             <div className="flex items-center gap-3">
               <a
-                href="https://twitter.com"
+                href="https://x.com/arcformsol"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-green-700 hover:text-green-400 transition-colors text-xs flex items-center gap-1"
