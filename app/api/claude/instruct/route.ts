@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { after } from 'next/server';
 import { anthropic, SYSTEM_PROMPT } from '@/lib/anthropic';
 import { getSupabaseAdmin } from '@/lib/supabase/server';
 import { BUILD_PHASES, getPhasePrompt } from '@/lib/build-phases';
 
+// Using Next.js 15's `after()` API for background work
+// This allows the function to continue running after the response is sent
+// Combined with maxDuration, we can achieve longer execution times
+
 export const dynamic = 'force-dynamic';
+
+// Vercel Pro: 300 seconds max for the main request
+// Background work via after() can extend beyond this
+export const maxDuration = 300;
 
 const OWNER_SECRET_KEY = process.env.OWNER_SECRET_KEY;
 
@@ -170,12 +179,14 @@ async function executePhase(
   const phasePrompt = getPhasePrompt(phaseId, userInstruction);
 
   let fullResponse = '';
-  // Character-by-character streaming for ~30 min builds
-  // ~10,000 chars total × 150ms per char = 1,500,000ms = 25 min base
-  // + ~500 newlines × 400ms extra = 200,000ms = 3.3 min extra
-  // Total: ~28-30 min
-  const CHUNK_DELAY_MS = 150; // 150ms per character for smooth typing effect
-  const NEWLINE_EXTRA_DELAY_MS = 400; // Extra 400ms on newlines for dramatic pauses
+  // Using Next.js after() for background execution - can run longer than maxDuration
+  // Target: ~10-15 minutes total for dramatic effect
+  // 3 phases × ~3,500 chars = ~10,500 chars total
+  // For 10 min streaming: 600,000ms / 10,500 = ~57ms per char
+  // For 15 min streaming: 900,000ms / 10,500 = ~85ms per char
+  // Using 60ms base + 100ms extra on newlines
+  const CHUNK_DELAY_MS = 60; // 60ms per character
+  const NEWLINE_EXTRA_DELAY_MS = 100; // Extra 100ms on newlines for pauses
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
@@ -228,8 +239,8 @@ async function executePhase(
   });
 
   // Pause between phases for dramatic effect and to let users see the result
-  // 30 seconds pause between phases for maximum drama
-  await new Promise(resolve => setTimeout(resolve, 30000));
+  // 15 seconds pause between phases for maximum drama
+  await new Promise(resolve => setTimeout(resolve, 15000));
 
   return parsedFiles;
 }
@@ -241,9 +252,9 @@ async function executeDirectMode(
   userInstruction: string
 ): Promise<ParsedFile[]> {
   let fullResponse = '';
-  // Character-by-character streaming (same delays as phase execution)
-  const CHUNK_DELAY_MS = 150; // 150ms per character for smooth typing effect
-  const NEWLINE_EXTRA_DELAY_MS = 400; // Extra 400ms on newlines for dramatic pauses
+  // Same delays as phase execution for consistency
+  const CHUNK_DELAY_MS = 60; // 60ms per character
+  const NEWLINE_EXTRA_DELAY_MS = 100; // Extra 100ms on newlines for pauses
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
@@ -280,13 +291,13 @@ async function executeDirectMode(
   return parseFiles(fullResponse);
 }
 
-// Background execution function - runs after response is sent
-async function executeInBackground(
+// Execute the build (runs synchronously within the request)
+async function executeBuild(
   instruction: string,
   currentFiles: ParsedFile[],
   currentVersion: number,
   isFirstBuild: boolean
-) {
+): Promise<{ success: boolean; error?: string }> {
   const supabaseAdmin = getSupabaseAdmin();
 
   // Setup broadcast channel
@@ -365,8 +376,10 @@ async function executeInBackground(
       }
     });
 
+    return { success: true };
+
   } catch (error) {
-    console.error('Background execution error:', error);
+    console.error('Build execution error:', error);
     // Try to broadcast error to clients
     try {
       await channel.send({
@@ -377,6 +390,7 @@ async function executeInBackground(
     } catch {
       // Ignore broadcast error
     }
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   } finally {
     // Cleanup channel
     try {
@@ -418,9 +432,11 @@ export async function POST(request: NextRequest) {
     const currentVersion = currentPage?.version || 0;
     const isFirstBuild = currentVersion === 0;
 
-    // Start background execution WITHOUT awaiting
-    // This allows the response to return immediately while processing continues
-    executeInBackground(instruction, currentFiles, currentVersion, isFirstBuild);
+    // Use Next.js 15's after() to run the build in background
+    // This returns immediately and continues execution after response is sent
+    after(async () => {
+      await executeBuild(instruction, currentFiles, currentVersion, isFirstBuild);
+    });
 
     // Return immediately - the streaming happens via Supabase Realtime
     return NextResponse.json({

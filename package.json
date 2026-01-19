@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.71.2",
     "@monaco-editor/react": "^4.7.0",
     "@supabase/supabase-js": "^2.89.0",
+    "@vercel/functions": "^3.3.6",
     "isomorphic-dompurify": "^2.35.0",
     "next": "16.1.1",
     "react": "19.2.3",

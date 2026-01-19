@@ -140,8 +140,8 @@ function combineFilesForPreview(files: FileState[]): string {
 }
 
 // Throttle interval for preview updates (ms)
-// With slower streaming (1.5s per chunk), update preview every 3 seconds
-const PREVIEW_THROTTLE_MS = 3000;
+// With 100ms per char streaming, update preview every 1 second
+const PREVIEW_THROTTLE_MS = 1000;
 
 export function useClaudeStream() {
   const [state, setState] = useState<ClaudeStreamState>({
