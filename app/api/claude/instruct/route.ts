@@ -172,8 +172,8 @@ async function executePhase(
   let fullResponse = '';
   let chunkBuffer = '';
   const BUFFER_SIZE = 1; // Single character for maximum granularity
-  const CHUNK_DELAY_MS = 150; // Slow delay between chunks for dramatic effect
-  const NEWLINE_EXTRA_DELAY_MS = 100; // Extra delay on newlines for natural typing feel
+  const CHUNK_DELAY_MS = 350; // Very slow delay for dramatic 20-min builds
+  const NEWLINE_EXTRA_DELAY_MS = 250; // Extra delay on newlines for dramatic pauses
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
@@ -236,7 +236,7 @@ async function executePhase(
   });
 
   // Pause between phases for dramatic effect and to let users see the result
-  await new Promise(resolve => setTimeout(resolve, 5000));
+  await new Promise(resolve => setTimeout(resolve, 10000));
 
   return parsedFiles;
 }
@@ -250,8 +250,8 @@ async function executeDirectMode(
   let fullResponse = '';
   let chunkBuffer = '';
   const BUFFER_SIZE = 1; // Single character for maximum granularity
-  const CHUNK_DELAY_MS = 150; // Slow delay between chunks for dramatic effect
-  const NEWLINE_EXTRA_DELAY_MS = 100; // Extra delay on newlines for natural typing feel
+  const CHUNK_DELAY_MS = 350; // Very slow delay for dramatic 20-min builds
+  const NEWLINE_EXTRA_DELAY_MS = 250; // Extra delay on newlines for dramatic pauses
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
