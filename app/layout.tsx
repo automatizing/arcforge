@@ -16,7 +16,8 @@ export const metadata: Metadata = {
   title: "Arcform",
   description: "Watch AI build websites in real-time",
   icons: {
-    icon: "/logo.png",
+    icon: "/logo.ico",
+    shortcut: "/logo.ico",
     apple: "/logo.png",
   },
 };
