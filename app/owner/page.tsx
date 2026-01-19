@@ -294,10 +294,10 @@ export default function OwnerPage() {
           )}
         </form>
 
-        {/* Bottom: Preview (small) + Files/Code */}
+        {/* Bottom: Preview (large) + Files/Code (small) */}
         <div className="flex-1 flex gap-4 min-h-0">
-          {/* Left: Small Preview */}
-          <div className="w-[280px] flex-shrink-0 bg-black rounded-lg border border-green-900/50 overflow-hidden flex flex-col">
+          {/* Left: Large Preview */}
+          <div className="flex-1 bg-black rounded-lg border border-green-900/50 overflow-hidden flex flex-col">
             <div className="bg-green-950/30 px-3 py-1.5 text-xs text-green-600 flex items-center justify-between border-b border-green-900/50">
               <div className="flex items-center gap-2">
                 <span className="text-green-700">{'>'}</span>
@@ -316,14 +316,14 @@ export default function OwnerPage() {
               <iframe
                 srcDoc={displayHtml}
                 className="w-full h-full border-0"
-                sandbox="allow-scripts"
+                sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
                 title="Preview"
               />
             </div>
           </div>
 
-          {/* Right: Files + Code */}
-          <div className="flex-1 flex flex-col rounded-lg border border-green-900/50 overflow-hidden min-h-0">
+          {/* Right: Files + Code (narrower) */}
+          <div className="w-[320px] flex-shrink-0 flex flex-col rounded-lg border border-green-900/50 overflow-hidden min-h-0">
             <FileExplorer
               files={displayFiles}
               activeFile={activeFile}
