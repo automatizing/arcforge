@@ -48,10 +48,11 @@ The page should now look visually complete but with static/placeholder content.`
     id: 'functionality',
     name: 'Adding Functionality',
     description: 'Implementing JavaScript and API integration',
-    prompt: `PHASE 3 - JAVASCRIPT FUNCTIONALITY
+    prompt: `PHASE 3 - JAVASCRIPT FUNCTIONALITY WITH PAGINATION
 
-Now add the complete JavaScript functionality:
-- Fetch data from /api/polymarket/events?closed=false&limit=15
+Now add the complete JavaScript functionality with pagination:
+- Fetch data from /api/polymarket/events?closed=false&limit=12&offset=0
+- Support pagination with limit (12 per page) and offset (page 1 = 0, page 2 = 12, etc.)
 - This returns EVENTS (not markets). Each event has: title, slug, image, volume, volume24hr, liquidity
 - Use event.image for the image URL (NOT external placeholder services)
 - Use event.title for the display text (NOT event.question)
@@ -61,13 +62,15 @@ Now add the complete JavaScript functionality:
 - Handle loading states (show/hide skeletons)
 - Handle errors gracefully with console.error
 - Add refresh button functionality
+- Add pagination controls: Previous button, Page indicator, Next button
+- Disable Previous on page 1, scroll to top on page change
 - Make buttons link to https://polymarket.com/event/ + event.slug
 
 Keep HTML and CSS mostly the same, just ensure they support the dynamic content.
-Change id="markets" to id="events" and class names from market-card to event-card.
+Add a .pagination section at the bottom with prev-btn, page-info, next-btn.
 Stats should show 3 columns: Volume | 24h | Liquidity
 
-The page should now be fully functional with real data from the API.`
+The page should now be fully functional with real data from the API and pagination.`
   }
 ];
 
