@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { getSupabase } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -139,6 +139,9 @@ function combineFilesForPreview(files: FileState[]): string {
   return html;
 }
 
+// Throttle interval for preview updates (ms)
+const PREVIEW_THROTTLE_MS = 500;
+
 export function useClaudeStream() {
   const [state, setState] = useState<ClaudeStreamState>({
     streamingCode: '',
@@ -152,6 +155,12 @@ export function useClaudeStream() {
     currentPhase: null,
     totalPhases: 0
   });
+
+  // Throttled preview HTML (updated less frequently to prevent flickering)
+  const [throttledPreviewHtml, setThrottledPreviewHtml] = useState(INITIAL_HTML);
+  const lastPreviewUpdateRef = useRef<number>(0);
+  const pendingPreviewRef = useRef<string | null>(null);
+  const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch initial page state
   const fetchCurrentPage = useCallback(async () => {
@@ -268,14 +277,63 @@ export function useClaudeStream() {
     ? state.streamingFiles
     : state.currentFiles;
 
-  const displayHtml = state.isTyping && state.streamingFiles.length > 0
+  // Raw HTML (computed every render for code viewer)
+  const rawDisplayHtml = state.isTyping && state.streamingFiles.length > 0
     ? combineFilesForPreview(state.streamingFiles)
     : (state.currentPage || INITIAL_HTML);
+
+  // Throttle preview updates to prevent flickering
+  useEffect(() => {
+    // If not typing, update immediately
+    if (!state.isTyping) {
+      setThrottledPreviewHtml(rawDisplayHtml);
+      lastPreviewUpdateRef.current = 0;
+      if (throttleTimeoutRef.current) {
+        clearTimeout(throttleTimeoutRef.current);
+        throttleTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastPreviewUpdateRef.current;
+
+    if (timeSinceLastUpdate >= PREVIEW_THROTTLE_MS) {
+      // Enough time has passed, update immediately
+      setThrottledPreviewHtml(rawDisplayHtml);
+      lastPreviewUpdateRef.current = now;
+      pendingPreviewRef.current = null;
+    } else {
+      // Store pending update and schedule it
+      pendingPreviewRef.current = rawDisplayHtml;
+
+      if (!throttleTimeoutRef.current) {
+        const delay = PREVIEW_THROTTLE_MS - timeSinceLastUpdate;
+        throttleTimeoutRef.current = setTimeout(() => {
+          if (pendingPreviewRef.current) {
+            setThrottledPreviewHtml(pendingPreviewRef.current);
+            lastPreviewUpdateRef.current = Date.now();
+            pendingPreviewRef.current = null;
+          }
+          throttleTimeoutRef.current = null;
+        }, delay);
+      }
+    }
+  }, [rawDisplayHtml, state.isTyping]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (throttleTimeoutRef.current) {
+        clearTimeout(throttleTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return {
     ...state,
     displayFiles,
-    displayHtml,
+    displayHtml: throttledPreviewHtml,
     setActiveFile
   };
 }
