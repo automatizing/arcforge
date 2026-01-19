@@ -171,9 +171,14 @@ async function executePhase(
 
   let fullResponse = '';
   let chunkBuffer = '';
-  const BUFFER_SIZE = 1; // Single character for maximum granularity
-  const CHUNK_DELAY_MS = 350; // Very slow delay for dramatic 20-min builds
-  const NEWLINE_EXTRA_DELAY_MS = 250; // Extra delay on newlines for dramatic pauses
+  // For ~30 min builds with ~10,000 chars total across 3 phases:
+  // ~1000 chunks (Claude sends ~10 chars per chunk on average)
+  // 30 min = 1,800,000ms / 1000 chunks = 1,800ms per chunk
+  // But we also have ~500 newlines with extra delay
+  // So: 1000 chunks × 1500ms + 500 newlines × 800ms = 1,500,000 + 400,000 = ~32 min
+  const BUFFER_SIZE = 1; // Process each chunk as it arrives
+  const CHUNK_DELAY_MS = 1500; // 1.5 seconds per chunk for ultra-slow dramatic builds
+  const NEWLINE_EXTRA_DELAY_MS = 800; // Extra 0.8 seconds on newlines for dramatic pauses
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
@@ -236,7 +241,8 @@ async function executePhase(
   });
 
   // Pause between phases for dramatic effect and to let users see the result
-  await new Promise(resolve => setTimeout(resolve, 10000));
+  // 30 seconds pause between phases for maximum drama
+  await new Promise(resolve => setTimeout(resolve, 30000));
 
   return parsedFiles;
 }
@@ -249,9 +255,10 @@ async function executeDirectMode(
 ): Promise<ParsedFile[]> {
   let fullResponse = '';
   let chunkBuffer = '';
-  const BUFFER_SIZE = 1; // Single character for maximum granularity
-  const CHUNK_DELAY_MS = 350; // Very slow delay for dramatic 20-min builds
-  const NEWLINE_EXTRA_DELAY_MS = 250; // Extra delay on newlines for dramatic pauses
+  // For ~30 min builds (same delays as phase execution)
+  const BUFFER_SIZE = 1; // Process each chunk as it arrives
+  const CHUNK_DELAY_MS = 1500; // 1.5 seconds per chunk for ultra-slow dramatic builds
+  const NEWLINE_EXTRA_DELAY_MS = 800; // Extra 0.8 seconds on newlines for dramatic pauses
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
