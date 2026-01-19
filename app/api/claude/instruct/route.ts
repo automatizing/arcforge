@@ -171,7 +171,9 @@ async function executePhase(
 
   let fullResponse = '';
   let chunkBuffer = '';
-  const BUFFER_SIZE = 3;
+  const BUFFER_SIZE = 2; // Smaller buffer = more granular streaming
+  const CHUNK_DELAY_MS = 50; // Delay between chunks (50ms for moderate speed)
+  const NEWLINE_EXTRA_DELAY_MS = 30; // Extra delay on newlines for dramatic effect
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
@@ -191,14 +193,17 @@ async function executePhase(
       fullResponse += text;
       chunkBuffer += text;
 
-      if (chunkBuffer.length >= BUFFER_SIZE || chunkBuffer.includes('\n')) {
+      const hasNewline = chunkBuffer.includes('\n');
+      if (chunkBuffer.length >= BUFFER_SIZE || hasNewline) {
         await channel.send({
           type: 'broadcast',
           event: 'chunk',
           payload: { text: chunkBuffer, phaseId }
         });
         chunkBuffer = '';
-        await new Promise(resolve => setTimeout(resolve, 10));
+        // Add extra delay on newlines for more natural typing feel
+        const delay = hasNewline ? CHUNK_DELAY_MS + NEWLINE_EXTRA_DELAY_MS : CHUNK_DELAY_MS;
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
@@ -244,7 +249,9 @@ async function executeDirectMode(
 ): Promise<ParsedFile[]> {
   let fullResponse = '';
   let chunkBuffer = '';
-  const BUFFER_SIZE = 3;
+  const BUFFER_SIZE = 2; // Smaller buffer = more granular streaming
+  const CHUNK_DELAY_MS = 50; // Delay between chunks (50ms for moderate speed)
+  const NEWLINE_EXTRA_DELAY_MS = 30; // Extra delay on newlines for dramatic effect
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
@@ -264,14 +271,17 @@ async function executeDirectMode(
       fullResponse += text;
       chunkBuffer += text;
 
-      if (chunkBuffer.length >= BUFFER_SIZE || chunkBuffer.includes('\n')) {
+      const hasNewline = chunkBuffer.includes('\n');
+      if (chunkBuffer.length >= BUFFER_SIZE || hasNewline) {
         await channel.send({
           type: 'broadcast',
           event: 'chunk',
           payload: { text: chunkBuffer }
         });
         chunkBuffer = '';
-        await new Promise(resolve => setTimeout(resolve, 10));
+        // Add extra delay on newlines for more natural typing feel
+        const delay = hasNewline ? CHUNK_DELAY_MS + NEWLINE_EXTRA_DELAY_MS : CHUNK_DELAY_MS;
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
