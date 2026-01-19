@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { after } from 'next/server';
 import { anthropic, SYSTEM_PROMPT } from '@/lib/anthropic';
 import { getSupabaseAdmin } from '@/lib/supabase/server';
 import { BUILD_PHASES, getPhasePrompt } from '@/lib/build-phases';
 
-// Using Next.js 15's `after()` API for background work
-// This allows the function to continue running after the response is sent
-// Combined with maxDuration, we can achieve longer execution times
-
 export const dynamic = 'force-dynamic';
 
-// Vercel Pro: 300 seconds max for the main request
-// Background work via after() can extend beyond this
+// Vercel Pro: 300 seconds max - execute synchronously within this limit
 export const maxDuration = 300;
 
 const OWNER_SECRET_KEY = process.env.OWNER_SECRET_KEY;
@@ -179,14 +173,13 @@ async function executePhase(
   const phasePrompt = getPhasePrompt(phaseId, userInstruction);
 
   let fullResponse = '';
-  // Using Next.js after() for background execution - can run longer than maxDuration
-  // Target: ~10-15 minutes total for dramatic effect
+  // Optimized for Vercel Pro 300s (5 min) limit - synchronous execution
+  // Budget: 300s - 20s phase pauses - 30s buffer = 250s for streaming
   // 3 phases × ~3,500 chars = ~10,500 chars total
-  // For 10 min streaming: 600,000ms / 10,500 = ~57ms per char
-  // For 15 min streaming: 900,000ms / 10,500 = ~85ms per char
-  // Using 60ms base + 100ms extra on newlines
-  const CHUNK_DELAY_MS = 60; // 60ms per character
-  const NEWLINE_EXTRA_DELAY_MS = 100; // Extra 100ms on newlines for pauses
+  // 250,000ms / 10,500 = ~24ms per char
+  // Using 22ms base + 40ms extra on newlines for dramatic typing effect
+  const CHUNK_DELAY_MS = 22; // 22ms per character
+  const NEWLINE_EXTRA_DELAY_MS = 40; // Extra 40ms on newlines
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
@@ -239,8 +232,8 @@ async function executePhase(
   });
 
   // Pause between phases for dramatic effect and to let users see the result
-  // 15 seconds pause between phases for maximum drama
-  await new Promise(resolve => setTimeout(resolve, 15000));
+  // 5 seconds pause between phases
+  await new Promise(resolve => setTimeout(resolve, 5000));
 
   return parsedFiles;
 }
@@ -253,8 +246,8 @@ async function executeDirectMode(
 ): Promise<ParsedFile[]> {
   let fullResponse = '';
   // Same delays as phase execution for consistency
-  const CHUNK_DELAY_MS = 60; // 60ms per character
-  const NEWLINE_EXTRA_DELAY_MS = 100; // Extra 100ms on newlines for pauses
+  const CHUNK_DELAY_MS = 22; // 22ms per character
+  const NEWLINE_EXTRA_DELAY_MS = 40; // Extra 40ms on newlines
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
@@ -432,16 +425,20 @@ export async function POST(request: NextRequest) {
     const currentVersion = currentPage?.version || 0;
     const isFirstBuild = currentVersion === 0;
 
-    // Use Next.js 15's after() to run the build in background
-    // This returns immediately and continues execution after response is sent
-    after(async () => {
-      await executeBuild(instruction, currentFiles, currentVersion, isFirstBuild);
-    });
+    // Execute synchronously - maxDuration=300 gives us 5 minutes
+    // Streaming happens via Supabase Realtime while request stays open
+    const result = await executeBuild(instruction, currentFiles, currentVersion, isFirstBuild);
 
-    // Return immediately - the streaming happens via Supabase Realtime
+    if (!result.success) {
+      return NextResponse.json({
+        success: false,
+        error: result.error || 'Build failed'
+      }, { status: 500 });
+    }
+
     return NextResponse.json({
       success: true,
-      message: 'Build started',
+      message: 'Build completed',
       isFirstBuild
     });
 
