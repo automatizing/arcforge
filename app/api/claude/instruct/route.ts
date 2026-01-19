@@ -170,15 +170,12 @@ async function executePhase(
   const phasePrompt = getPhasePrompt(phaseId, userInstruction);
 
   let fullResponse = '';
-  let chunkBuffer = '';
-  // For ~30 min builds with ~10,000 chars total across 3 phases:
-  // ~1000 chunks (Claude sends ~10 chars per chunk on average)
-  // 30 min = 1,800,000ms / 1000 chunks = 1,800ms per chunk
-  // But we also have ~500 newlines with extra delay
-  // So: 1000 chunks × 1500ms + 500 newlines × 800ms = 1,500,000 + 400,000 = ~32 min
-  const BUFFER_SIZE = 1; // Process each chunk as it arrives
-  const CHUNK_DELAY_MS = 1500; // 1.5 seconds per chunk for ultra-slow dramatic builds
-  const NEWLINE_EXTRA_DELAY_MS = 800; // Extra 0.8 seconds on newlines for dramatic pauses
+  // Character-by-character streaming for ~30 min builds
+  // ~10,000 chars total × 150ms per char = 1,500,000ms = 25 min base
+  // + ~500 newlines × 400ms extra = 200,000ms = 3.3 min extra
+  // Total: ~28-30 min
+  const CHUNK_DELAY_MS = 150; // 150ms per character for smooth typing effect
+  const NEWLINE_EXTRA_DELAY_MS = 400; // Extra 400ms on newlines for dramatic pauses
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
@@ -196,30 +193,20 @@ async function executePhase(
     if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
       const text = event.delta.text;
       fullResponse += text;
-      chunkBuffer += text;
 
-      const hasNewline = chunkBuffer.includes('\n');
-      if (chunkBuffer.length >= BUFFER_SIZE || hasNewline) {
+      // Send character by character for dramatic typing effect
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
         await channel.send({
           type: 'broadcast',
           event: 'chunk',
-          payload: { text: chunkBuffer, phaseId }
+          payload: { text: char, phaseId }
         });
-        chunkBuffer = '';
-        // Add extra delay on newlines for more natural typing feel
-        const delay = hasNewline ? CHUNK_DELAY_MS + NEWLINE_EXTRA_DELAY_MS : CHUNK_DELAY_MS;
+        // Extra delay on newlines for dramatic pauses
+        const delay = char === '\n' ? CHUNK_DELAY_MS + NEWLINE_EXTRA_DELAY_MS : CHUNK_DELAY_MS;
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
-  }
-
-  // Send remaining buffer
-  if (chunkBuffer.length > 0) {
-    await channel.send({
-      type: 'broadcast',
-      event: 'chunk',
-      payload: { text: chunkBuffer, phaseId }
-    });
   }
 
   // Parse the response
@@ -254,11 +241,9 @@ async function executeDirectMode(
   userInstruction: string
 ): Promise<ParsedFile[]> {
   let fullResponse = '';
-  let chunkBuffer = '';
-  // For ~30 min builds (same delays as phase execution)
-  const BUFFER_SIZE = 1; // Process each chunk as it arrives
-  const CHUNK_DELAY_MS = 1500; // 1.5 seconds per chunk for ultra-slow dramatic builds
-  const NEWLINE_EXTRA_DELAY_MS = 800; // Extra 0.8 seconds on newlines for dramatic pauses
+  // Character-by-character streaming (same delays as phase execution)
+  const CHUNK_DELAY_MS = 150; // 150ms per character for smooth typing effect
+  const NEWLINE_EXTRA_DELAY_MS = 400; // Extra 400ms on newlines for dramatic pauses
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
@@ -276,30 +261,20 @@ async function executeDirectMode(
     if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
       const text = event.delta.text;
       fullResponse += text;
-      chunkBuffer += text;
 
-      const hasNewline = chunkBuffer.includes('\n');
-      if (chunkBuffer.length >= BUFFER_SIZE || hasNewline) {
+      // Send character by character for dramatic typing effect
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
         await channel.send({
           type: 'broadcast',
           event: 'chunk',
-          payload: { text: chunkBuffer }
+          payload: { text: char }
         });
-        chunkBuffer = '';
-        // Add extra delay on newlines for more natural typing feel
-        const delay = hasNewline ? CHUNK_DELAY_MS + NEWLINE_EXTRA_DELAY_MS : CHUNK_DELAY_MS;
+        // Extra delay on newlines for dramatic pauses
+        const delay = char === '\n' ? CHUNK_DELAY_MS + NEWLINE_EXTRA_DELAY_MS : CHUNK_DELAY_MS;
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
-  }
-
-  // Send remaining buffer
-  if (chunkBuffer.length > 0) {
-    await channel.send({
-      type: 'broadcast',
-      event: 'chunk',
-      payload: { text: chunkBuffer }
-    });
   }
 
   return parseFiles(fullResponse);
