@@ -7,6 +7,32 @@ export const dynamic = 'force-dynamic';
 
 const OWNER_SECRET_KEY = process.env.OWNER_SECRET_KEY;
 
+// Generic system prompt for modifications (not first build)
+const MODIFICATION_SYSTEM_PROMPT = `You are a web developer assistant that modifies existing pages.
+
+## OUTPUT FORMAT - CRITICAL
+Output EXACTLY 3 files with these delimiters. NO text before or after. NO markdown. NO explanations.
+
+===FILE:index.html===
+[your HTML here - NO style or script tags]
+===ENDFILE===
+
+===FILE:styles.css===
+[your CSS here]
+===ENDFILE===
+
+===FILE:script.js===
+[your JavaScript here]
+===ENDFILE===
+
+## RULES
+- Modify the existing files based on the user's request
+- Keep what works, change only what's needed
+- Do NOT use template literals (backticks) - use string concatenation with +
+- Do NOT use placeholder image services
+- Output complete files, not partial changes
+- If the user asks for a completely new page, create it from scratch`;
+
 // File parsing types
 interface ParsedFile {
   name: string;
@@ -210,6 +236,58 @@ async function executePhase(
   return parsedFiles;
 }
 
+// Execute direct mode (no phases) for modifications
+async function executeDirectMode(
+  channel: ReturnType<ReturnType<typeof getSupabaseAdmin>['channel']>,
+  currentFiles: ParsedFile[],
+  userInstruction: string
+): Promise<ParsedFile[]> {
+  let fullResponse = '';
+  let chunkBuffer = '';
+  const BUFFER_SIZE = 3;
+
+  const stream = anthropic.messages.stream({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 8192,
+    system: MODIFICATION_SYSTEM_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: `Current files:\n\n${currentFiles.map(f => `===FILE:${f.name}===\n${f.content}\n===ENDFILE===`).join('\n\n')}\n\nUser request: ${userInstruction}\n\nRemember: Output ONLY the 3 files with delimiters. No explanations.`
+      }
+    ]
+  });
+
+  for await (const event of stream) {
+    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+      const text = event.delta.text;
+      fullResponse += text;
+      chunkBuffer += text;
+
+      if (chunkBuffer.length >= BUFFER_SIZE || chunkBuffer.includes('\n')) {
+        await channel.send({
+          type: 'broadcast',
+          event: 'chunk',
+          payload: { text: chunkBuffer }
+        });
+        chunkBuffer = '';
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }
+  }
+
+  // Send remaining buffer
+  if (chunkBuffer.length > 0) {
+    await channel.send({
+      type: 'broadcast',
+      event: 'chunk',
+      payload: { text: chunkBuffer }
+    });
+  }
+
+  return parseFiles(fullResponse);
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Validate owner authentication
@@ -254,31 +332,40 @@ export async function POST(request: NextRequest) {
       });
     });
 
+    // Determine if this is first build (use phases) or modification (direct mode)
+    const isFirstBuild = currentVersion === 0;
+
     // Broadcast that Claude is starting
     await channel.send({
       type: 'broadcast',
       event: 'start',
       payload: {
         instruction,
-        totalPhases: BUILD_PHASES.length
+        totalPhases: isFirstBuild ? BUILD_PHASES.length : 1,
+        isFirstBuild
       }
     });
 
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    // Execute each phase sequentially
-    for (let i = 0; i < BUILD_PHASES.length; i++) {
-      const phase = BUILD_PHASES[i];
-      currentFiles = await executePhase(
-        channel,
-        currentFiles,
-        phase.id,
-        phase.name,
-        phase.description,
-        instruction,
-        i + 1,
-        BUILD_PHASES.length
-      );
+    if (isFirstBuild) {
+      // First build: Execute each phase sequentially with Polymarket prompts
+      for (let i = 0; i < BUILD_PHASES.length; i++) {
+        const phase = BUILD_PHASES[i];
+        currentFiles = await executePhase(
+          channel,
+          currentFiles,
+          phase.id,
+          phase.name,
+          phase.description,
+          instruction,
+          i + 1,
+          BUILD_PHASES.length
+        );
+      }
+    } else {
+      // Modification: Direct mode without phases
+      currentFiles = await executeDirectMode(channel, currentFiles, instruction);
     }
 
     // Save final page state
